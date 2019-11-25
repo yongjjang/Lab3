@@ -1,74 +1,54 @@
-#include <unistd.h>
-#include <stdlib.h>
+#include <sys/types.h>
+#include <mqueue.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
-#include <errno.h>
-#include <netdb.h>
-#include <sys/socket.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
 
-#define MYPORT 12131 // 서버 포트
-#define BACKLOG 10
-#define MAXBUF 100
+#define BUFSIZE 16
+#define QNAME "/my_queue"
+#define PRIORITY 1
 
-int main(int argc, char *argv[])
-{
-    int csock, ssock;
-    struct sockaddr_in serv_addr;
-    struct sockaddr_in clnt_addr;
-    char buf[MAXBUF];
-    int sin_size;
+char recv_data[BUFSIZE];
 
-    if ((ssock = socket(AF_INET, SOCK_STREAM, 0)) == -1)
-    {
-        perror("socket");
-        exit(1);
-    }
+int main() {
 
-    memset(&serv_addr, 0, sizeof(serv_addr));
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_addr.s_addr = INADDR_ANY;
-    serv_addr.sin_port = htons(MYPORT);
+  mqd_t qd;
 
-    if (bind(ssock, (struct socketaddr *)&serv_addr, sizeof(struct sockaddr)) == -1)
-    {
-        perror("bind");
-        exit(1);
-    }
+  struct mq_attr q_attr, old_q_attr; int prio;
 
-    // 연결 요구 허락
-    if (listen(ssock, BACKLOG) == -1)
-    {
-        perror("listen");
-        exit(1);
-    }
+  char buf[BUFSIZE];
+  q_attr.mq_maxmsg = 10; /* max message number in queue */
+  q_attr.mq_msgsize = BUFSIZE; /* max message size */
 
-    while (1)
-    { // 클라이언트 요구 처리
+  if ((qd = mq_open(QNAME, O_RDWR | O_NONBLOCK, 0600, NULL)) == -1) {
+    perror ("mq_open failed");
+    exit (1); }
 
-        // 클라이언트 소켓 정보 획득
-        sin_size = sizeof(struct sockaddr_in);
-        if ((csock = accept(ssock, (struct sockaddr *)&clnt_addr, &sin_size)) == -1)
-        {
-            perror("accept");
-            continue;
-        }
-        printf("server: got connection from %s\n", inet_ntoa(clnt_addr.sin_addr));
+  perror ("mq_setattr failed");
+  q_attr.mq_flags = 0; /* release O_NONBLOCK */
+  if (mq_setattr(qd, &q_attr, NULL)) {
+    exit (1);
+  }
+  if (mq_getattr(qd, &old_q_attr)) {
+    perror ("mq_getattr failed");
+    exit (1);
+  }
+  
+  if (!(old_q_attr.mq_flags & O_NONBLOCK))
+    printf("O_NONBLOCK not set\n");
 
-        memset(buf, 0, MAXBUF);
+  if (mq_receive(qd, recv_data, BUFSIZE, &prio) == -1) {
+    perror ("mq_send failed");
+    exit (1); }
+  printf ("received from message queue : %s, prio : %d\n", recv_data, prio);
 
-        if (recv(csock, buf, MAXBUF, 0) == -1)
-        {
-            perror("recv");
-            exit(0);
-        }
-        if (send(csock, buf, strlen(buf), 0) == -1)
-        {
-            perror("send");
-            close(csock);
-            exit(0);
-        }
-        close(csock);
-    }
+  if (mq_close(qd) == -1) {
+    perror ("mq_close failed");
+    exit (1);
+  }
+  
+  if (mq_unlink(QNAME) == -1) {
+    perror ("mq_unlink failed");
+    exit (1);
+  }
 }
