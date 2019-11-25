@@ -16,10 +16,10 @@
 
 void main(int argc, char* argv[])
 {
-  FILE *fp;
+  FILE *fp, *copy_fp;
   char *path = argv[1];
   char buf[SHMSIZE];
-int status, shmd, count;
+  int status, shmd, count;
   void *shmaddr;
   pid_t pid;
 
@@ -44,25 +44,28 @@ int status, shmd, count;
       exit (1);
     }
 
-    fp = fopen(path, "r");
+    if((fp = fopen(path, "r")) == NULL){
+      perror("fopen");
+      exit(1);
+    }
 
     while(feof(fp) == 0){
       count == fread(buf, sizeof(char), SHMSIZE, fp);
       strcpy((char *)shmaddr, buf);      
-      printf("%s",buf);
+      //printf("%s",buf);
     }
-
-
 
     if (munmap(shmaddr, SHMSIZE) == -1) {
       perror ("munmap failed");
       exit (1);
     }
+    
+    fclose(fp);
 
   }else if (pid > 0){
     /* parents read */
     pid = wait((int *) 0);
-    printf("Hello World!");
+
     if ((shmd = shm_open(SHMNAME, O_RDWR, 0666)) == -1) {
       perror ("shm_open failed");
       exit (1);
@@ -77,7 +80,20 @@ int status, shmd, count;
       perror ("mlock failed");
       exit (1);
     }
-    printf("received from shared memory : %s\n", (char *)shmaddr);
+
+
+    strcat(path,"_copy");
+
+    if((copy_fp = fopen(path, "w")) == NULL){
+      perror("fopen");
+      exit(1);
+    }
+
+    fwrite(shmaddr, sizeof(char), SHMSIZE, copy_fp);
+    fclose(copy_fp);
+
+
+    //printf("received from shared memory : %s\n", (char *)shmaddr);
   
     if (munmap(shmaddr, SHMSIZE) == -1) {
       perror ("munmap failed");
@@ -90,6 +106,8 @@ int status, shmd, count;
       perror ("shm_unlink failed");
       exit (1);
     }
+
+    
   }else{
     perror("fork Error");
     exit(1);
