@@ -8,9 +8,9 @@
 #include <time.h>
 #define BUFSIZE 512 /* 읽혀질 덩어리의 크기 */
 
-char practice_1[BUFSIZE] = "Hello world! click me! inan!";
-char practice_2[BUFSIZE] = "He is truly happy who makes others happy";
-char practice_3[BUFSIZE] = "Early bird catches the worm";
+char practice_1[BUFSIZE] = "Hello world! input my text! i am yongjjang!";
+char practice_2[BUFSIZE] = "Early bird catches the worm";
+char practice_3[BUFSIZE] = "He is truly happy who makes others happy";
 
 int main(){
     time_t start_time, end_time;
